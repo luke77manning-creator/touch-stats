@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Touch Stats — Brisbane Cobras</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f2447">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Touch Stats">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-32.png" sizes="32x32">
+
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-team">
+      <div class="crest"><img src="icons/cobras-logo.png" alt="Brisbane Cobras logo"></div>
+      <div class="header-text">
+        <h1 id="team-name">16 Boys Red</h1>
+        <p id="team-sub">Brisbane Cobras · National Youth Championships</p>
+      </div>
+    </div>
+    <div id="live-indicator" class="live-indicator hidden">
+      <span class="dot"></span> LIVE
+    </div>
+  </header>
+
+  <!-- Views -->
+  <main class="views">
+
+    <!-- DASHBOARD -->
+    <section id="view-dashboard" class="view">
+      <div id="live-banner" class="live-banner hidden"></div>
+      <div id="next-game-card" class="card next-game-card hidden"></div>
+      <div id="offline-warning" class="offline-warning hidden"></div>
+
+      <div class="section-row">
+        <h2>Season Record</h2>
+      </div>
+      <div id="record-cards" class="stat-cards"></div>
+
+      <div class="section-row">
+        <h2>Cumulative Team Stats</h2>
+        <span class="muted" id="games-played-label"></span>
+      </div>
+      <div id="team-totals" class="stat-cards"></div>
+
+      <div class="section-row">
+        <h2>Player Leaderboard</h2>
+        <select id="leaderboard-stat" class="select-inline"></select>
+      </div>
+      <div id="leaderboard" class="card"></div>
+
+      <button id="btn-new-game-dash" class="btn btn-primary btn-lg btn-block">Start New Game</button>
+    </section>
+
+    <!-- LIVE GAME -->
+    <section id="view-live" class="view">
+      <div id="no-live-game">
+        <div class="card empty-state">
+          <h2>No Game in Progress</h2>
+          <p class="muted">Start a new game to begin tracking stats for this match.</p>
+          <button id="btn-new-game-live" class="btn btn-primary btn-lg">Start New Game</button>
+        </div>
+      </div>
+
+      <div id="live-game-panel" class="hidden">
+        <div id="live-sticky-score" class="live-sticky-score">
+          <span id="sticky-opponent"></span>
+          <span id="sticky-score"></span>
+        </div>
+
+        <div class="card live-header-card">
+          <div class="live-meta">
+            <div>
+              <div class="muted small" id="live-round"></div>
+              <h2 id="live-opponent-label">vs Opponent</h2>
+              <div class="muted small" id="live-date"></div>
+            </div>
+            <div class="score-board">
+              <div class="score-block">
+                <div class="score-num" id="score-us">0</div>
+                <div class="score-label">US</div>
+              </div>
+              <div class="score-sep">–</div>
+              <div class="score-block">
+                <div class="score-num" id="score-them">0</div>
+                <div class="score-label">THEM</div>
+                <div class="score-steppers">
+                  <button class="btn-step" id="opp-minus">−</button>
+                  <button class="btn-step" id="opp-plus">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="live-actions">
+            <button id="btn-undo" class="btn btn-ghost">Undo Last Tap</button>
+            <button id="btn-edit-squad" class="btn btn-ghost">Edit Squad</button>
+            <button id="btn-end-game" class="btn btn-danger">End Game</button>
+          </div>
+        </div>
+
+        <div id="category-tabs" class="tab-row"></div>
+        <p class="hint">Tap a stat, then pick who did it</p>
+
+        <div class="live-split">
+          <div class="live-col-tiles">
+            <div id="stat-tiles" class="stat-tiles"></div>
+
+            <div class="section-row"><h2>Recent Activity</h2></div>
+            <div id="recent-activity" class="card recent-activity-list"></div>
+          </div>
+          <div class="live-col-totals">
+            <div class="section-row"><h2>This Game — Player Totals</h2></div>
+            <div id="stat-grid-wrap" class="card grid-wrap">
+              <table id="stat-grid" class="stat-grid"></table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ROSTER -->
+    <section id="view-roster" class="view">
+      <div class="section-row">
+        <h2>Squad</h2>
+        <button id="btn-add-player" class="btn btn-primary">+ Add Player</button>
+      </div>
+      <div id="roster-list" class="card list"></div>
+    </section>
+
+    <!-- HISTORY -->
+    <section id="view-history" class="view">
+      <div class="section-row"><h2>Game History</h2></div>
+      <div id="history-list" class="card list"></div>
+
+      <div id="game-detail" class="hidden">
+        <div class="section-row">
+          <button id="btn-back-history" class="btn btn-ghost">‹ Back to History</button>
+        </div>
+        <div id="game-detail-content"></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="view-settings" class="view">
+      <div class="section-row"><h2>Team Details</h2></div>
+      <div class="card form-card">
+        <label>Team / Age Group<input id="set-team-name" type="text"></label>
+        <label>Club<input id="set-team-club" type="text"></label>
+        <label>Event<input id="set-team-event" type="text"></label>
+        <button id="btn-save-team" class="btn btn-primary">Save</button>
+      </div>
+
+      <div class="section-row"><h2>Display</h2></div>
+      <div class="card form-card">
+        <div class="switch-row">
+          <div>
+            <strong>Outdoor / High-Contrast Mode</strong>
+            <p class="muted small" style="margin:2px 0 0;">Bigger text and bolder contrast for reading the screen in direct sunlight.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="set-outdoor-mode">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="section-row">
+        <h2>Upcoming Fixtures (The Draw)</h2>
+        <button id="btn-add-fixture" class="btn btn-primary">+ Add Fixture</button>
+      </div>
+      <div id="fixtures-list" class="card list"></div>
+
+      <div class="section-row">
+        <h2>Stat Categories</h2>
+        <button id="btn-add-stat" class="btn btn-primary">+ Add Stat</button>
+      </div>
+      <div id="stat-defs-list" class="card list"></div>
+
+      <div class="section-row"><h2>Data</h2></div>
+      <div class="card form-card">
+        <p class="muted">Everything is stored only on this iPad. Back up regularly, especially before/after each tournament day.</p>
+        <p id="offline-status" class="small"></p>
+        <div class="btn-row">
+          <button id="btn-export-json" class="btn">Export Backup (JSON)</button>
+          <button id="btn-export-csv" class="btn">Export Stats (CSV)</button>
+          <label class="btn" for="import-file">Restore Backup</label>
+          <input type="file" id="import-file" accept="application/json" class="hidden">
+        </div>
+        <div class="btn-row">
+          <button id="btn-reset-all" class="btn btn-danger">Reset All Data</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Tab bar -->
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-view="dashboard">
+      <span class="tab-icon">⌂</span><span>Dashboard</span>
+    </button>
+    <button class="tab-btn" data-view="live">
+      <span class="tab-icon">●</span><span>Live Game</span>
+    </button>
+    <button class="tab-btn" data-view="roster">
+      <span class="tab-icon">☰</span><span>Roster</span>
+    </button>
+    <button class="tab-btn" data-view="history">
+      <span class="tab-icon">▤</span><span>History</span>
+    </button>
+    <button class="tab-btn" data-view="settings">
+      <span class="tab-icon">⚙</span><span>Settings</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Modal root -->
+<div id="modal-root"></div>
+
+<script src="js/storage.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

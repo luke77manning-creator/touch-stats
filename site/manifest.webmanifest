@@ -1,0 +1,16 @@
+{
+  "name": "Touch Stats — Brisbane Cobras",
+  "short_name": "Touch Stats",
+  "description": "Offline stat tracker for the Brisbane Cobras 16 Boys Red touch football team.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f2447",
+  "theme_color": "#0f2447",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
