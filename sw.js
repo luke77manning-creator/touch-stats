@@ -1,4 +1,4 @@
-const CACHE_NAME = 'touch-stats-v6';
+const CACHE_NAME = 'touch-stats-v7';
 const ASSETS = [
   './',
   './index.html',

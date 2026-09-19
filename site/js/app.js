@@ -972,9 +972,11 @@ const App = (() => {
           msg = 'Offline cache not installed yet — stay in the app for a few seconds while online, then close and reopen it.';
         } else {
           let files = 0;
-          for (const key of await caches.keys()) files += (await (await caches.open(key)).keys()).length;
+          const keys = await caches.keys();
+          for (const key of keys) files += (await (await caches.open(key)).keys()).length;
           ok = files > 0;
-          msg = ok ? `Ready for offline use — ${files} files cached on this device.` : 'Offline cache is empty — reopen the app while online.';
+          const ver = keys.find(k => k.startsWith('touch-stats-')) || 'unknown version';
+          msg = ok ? `Ready for offline use — ${files} files cached (${ver}).` : 'Offline cache is empty — reopen the app while online.';
         }
       }
     } catch (e) {
@@ -1051,8 +1053,19 @@ const App = (() => {
     switchView('dashboard');
 
     if ('serviceWorker' in navigator) {
+      // iOS is lazy about noticing a new worker, and GitHub Pages serves sw.js with
+      // max-age=600 — updateViaCache:'none' forces the script itself past the HTTP cache.
+      const hadController = !!navigator.serviceWorker.controller;
+      let reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadController || reloading) return;
+        reloading = true;
+        window.location.reload();
+      });
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed', err));
+        navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+          .then(reg => reg.update())
+          .catch(err => console.warn('SW registration failed', err));
       });
     }
   }
