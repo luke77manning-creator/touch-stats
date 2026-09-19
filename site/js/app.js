@@ -4,6 +4,86 @@ const App = (() => {
   let currentView = 'dashboard';
   let currentCategory = null;
   let historyDetailId = null;
+  let timerInterval = null;
+
+  const HALF_SECS = 20 * 60;
+
+  function fmtTimer(secs) {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  function timerRemaining(game) {
+    if (game.timerStatus !== 'running') return HALF_SECS;
+    const elapsed = Math.floor((Date.now() - game.timerStartedAt) / 1000);
+    return Math.max(0, HALF_SECS - elapsed);
+  }
+
+  function stopTimerInterval() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  }
+
+  function startTimerInterval(gameId) {
+    stopTimerInterval();
+    timerInterval = setInterval(() => {
+      const game = Storage.getLiveGame();
+      if (!game || game.id !== gameId) { stopTimerInterval(); return; }
+      renderTimerSection(game);
+    }, 500);
+  }
+
+  function renderTimerSection(game) {
+    const display = $('#timer-display');
+    const btn = $('#timer-action-btn');
+    if (!display || !btn) return;
+
+    const status = game.timerStatus || 'idle';
+    const half = game.timerHalf || 1;
+    const remaining = timerRemaining(game);
+
+    if (status === 'idle') {
+      display.textContent = fmtTimer(HALF_SECS);
+      btn.textContent = '▶ Start';
+      btn.classList.remove('hidden');
+    } else if (status === 'running') {
+      display.textContent = (half === 1 ? '1H ' : '2H ') + fmtTimer(remaining);
+      btn.classList.add('hidden');
+      if (remaining === 0) {
+        if (half === 1) {
+          Storage.updateGameTimer(game.id, { timerStatus: 'halftime', timerStartedAt: null });
+          stopTimerInterval();
+          toast('Half Time!');
+        } else {
+          Storage.updateGameTimer(game.id, { timerStatus: 'done', timerStartedAt: null });
+          stopTimerInterval();
+          toast('Full Time!');
+        }
+        renderTimerSection(Storage.getLiveGame());
+        return;
+      }
+    } else if (status === 'halftime') {
+      display.textContent = 'HALF TIME';
+      btn.textContent = '▶ 2nd Half';
+      btn.classList.remove('hidden');
+    } else if (status === 'done') {
+      display.textContent = 'FULL TIME';
+      btn.classList.add('hidden');
+    }
+
+    btn.onclick = () => {
+      const g = Storage.getLiveGame();
+      if (!g) return;
+      const st = g.timerStatus || 'idle';
+      if (st === 'idle') {
+        Storage.updateGameTimer(g.id, { timerStatus: 'running', timerHalf: 1, timerStartedAt: Date.now() });
+      } else if (st === 'halftime') {
+        Storage.updateGameTimer(g.id, { timerStatus: 'running', timerHalf: 2, timerStartedAt: Date.now() });
+      }
+      startTimerInterval(g.id);
+      renderTimerSection(Storage.getLiveGame());
+    };
+  }
 
   // ---------- utils ----------
   function $(sel, root) { return (root || document).querySelector(sel); }
@@ -59,6 +139,7 @@ const App = (() => {
 
   // ---------- navigation ----------
   function switchView(name) {
+    if (name !== 'live') stopTimerInterval();
     currentView = name;
     $all('.view').forEach(v => v.classList.remove('active'));
     $(`#view-${name}`).classList.add('active');
@@ -220,6 +301,10 @@ const App = (() => {
     renderStatTiles(live, data, currentCategory);
     renderRecapGrid(live, data, currentCategory);
     renderRecentActivity(live, data);
+
+    stopTimerInterval();
+    renderTimerSection(live);
+    if ((live.timerStatus || 'idle') === 'running') startTimerInterval(live.id);
   }
 
   function renderRecentActivity(game, data) {
@@ -954,6 +1039,13 @@ const App = (() => {
       btnRow.appendChild(el('button', { class: 'btn btn-danger', onclick: () => { Storage.resetAll(); closeModal(); updateHeader(); switchView('dashboard'); } }, ['Reset Everything']));
       wrap.appendChild(btnRow);
       openModal(wrap);
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && currentView === 'live') {
+        const game = Storage.getLiveGame();
+        if (game) renderTimerSection(game);
+      }
     });
 
     switchView('dashboard');

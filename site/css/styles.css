@@ -159,12 +159,23 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 /* Sticky score bar */
 .live-sticky-score {
   position: sticky; top: 0; z-index: 6;
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; gap: 10px;
   background: var(--navy); color: #fff; border-radius: 12px;
   padding: 9px 14px; margin-bottom: 12px; font-weight: 700; font-size: 14px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
-#sticky-score { font-size: 17px; font-weight: 800; }
+#sticky-opponent { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+#sticky-score { font-size: 17px; font-weight: 800; flex-shrink: 0; }
+
+/* Game timer */
+.timer-section { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.timer-display { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: -0.3px; }
+.timer-action-btn {
+  background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.38);
+  color: #fff; border-radius: 7px; padding: 5px 9px;
+  font-size: 12px; font-weight: 700; cursor: pointer; touch-action: manipulation; white-space: nowrap;
+}
+.timer-action-btn:active { background: rgba(255,255,255,0.35); transform: scale(0.95); }
 
 /* Live game header card */
 .live-header-card { margin-bottom: 14px; }
@@ -366,6 +377,8 @@ html.outdoor-mode .section-row h2 { font-size: 16px; }
 html.outdoor-mode .hint { font-size: 14px; }
 html.outdoor-mode .live-sticky-score { font-size: 16px; }
 html.outdoor-mode #sticky-score { font-size: 19px; }
+html.outdoor-mode .timer-display { font-size: 17px; }
+html.outdoor-mode .timer-action-btn { font-size: 13px; padding: 6px 11px; }
 
 /* Offline cache status */
 .offline-warning {

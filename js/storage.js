@@ -144,10 +144,21 @@ const Storage = (() => {
       log: [],
       createdAt: Date.now(),
       fixtureId: fixtureId || null,
+      timerHalf: 1,
+      timerStatus: 'idle',
+      timerStartedAt: null,
     };
     data.games.push(g);
     save();
     return g;
+  }
+
+  function updateGameTimer(gameId, patch) {
+    load();
+    const g = data.games.find(x => x.id === gameId);
+    if (!g) return;
+    Object.assign(g, patch);
+    save();
   }
 
   function getGame(id) {
@@ -338,7 +349,7 @@ const Storage = (() => {
   return {
     get, addPlayer, updatePlayer, removePlayer,
     addStatDef, updateStatDef, removeStatDef, reorderStatDefs,
-    createGame, getGame, getLiveGame, logStat, undoLast, removeLogEntry, setOppScore, updateGameMeta, endGame, reopenGame, deleteGame,
+    createGame, getGame, getLiveGame, logStat, undoLast, removeLogEntry, setOppScore, updateGameMeta, updateGameTimer, endGame, reopenGame, deleteGame,
     addFixture, updateFixture, removeFixture, listFixtures, nextFixture,
     computeTotals, completedGames, cumulativeTotals, teamTotalsFor, record,
     exportJSON, importJSON, resetAll, updateSettings,
