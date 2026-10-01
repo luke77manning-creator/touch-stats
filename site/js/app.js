@@ -216,9 +216,12 @@ const App = (() => {
     const totalsWrap = $('#team-totals');
     totalsWrap.innerHTML = '';
     data.statDefs.forEach(sd => {
+      const total = teamTotals[sd.id] || 0;
+      const avg = games.length ? (total / games.length).toFixed(1) : '–';
       totalsWrap.appendChild(el('div', { class: 'stat-card' }, [
-        el('div', { class: 'stat-card-val' }, [String(teamTotals[sd.id] || 0)]),
+        el('div', { class: 'stat-card-val' }, [String(total)]),
         el('div', { class: 'stat-card-label' }, [sd.label]),
+        el('div', { class: 'stat-card-avg' }, [`${avg} / game`]),
       ]));
     });
 

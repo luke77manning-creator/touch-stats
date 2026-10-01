@@ -130,6 +130,8 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .stat-card-val { font-size: 24px; font-weight: 800; color: var(--navy); }
 @media (prefers-color-scheme: dark) { .stat-card-val { color: #7fa8e8; } }
 .stat-card-label { font-size: 11px; color: var(--muted); margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+#team-totals .stat-card { display: flex; flex-direction: column; }
+.stat-card-avg { font-size: 13px; font-weight: 700; color: var(--red); margin-top: auto; padding-top: 6px; border-top: 1px solid var(--border); }#team-totals .stat-card-label { margin-bottom: 6px; }
 
 /* Leaderboard */
 .select-inline {
@@ -373,6 +375,7 @@ html.outdoor-mode .stat-grid th, html.outdoor-mode .stat-grid td { font-size: 15
 html.outdoor-mode .tab-chip { font-size: 15px; padding: 11px 18px; }
 html.outdoor-mode .btn { font-size: 16px; padding: 13px 18px; }
 html.outdoor-mode .stat-card-val { font-size: 30px; }
+html.outdoor-mode .stat-card-avg { font-size: 15px; }
 html.outdoor-mode .section-row h2 { font-size: 16px; }
 html.outdoor-mode .hint { font-size: 14px; }
 html.outdoor-mode .live-sticky-score { font-size: 16px; }
