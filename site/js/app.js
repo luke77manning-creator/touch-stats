@@ -4,9 +4,11 @@ const App = (() => {
   let currentView = 'dashboard';
   let currentCategory = null;
   let historyDetailId = null;
+  let detailHalf = null;
   let timerInterval = null;
 
   const HALF_SECS = 20 * 60;
+  const WARN_SECS = 2 * 60;
 
   function fmtTimer(secs) {
     const m = Math.floor(secs / 60);
@@ -34,52 +36,54 @@ const App = (() => {
   }
 
   function renderTimerSection(game) {
-    const display = $('#timer-display');
-    const btn = $('#timer-action-btn');
-    if (!display || !btn) return;
+    const section = $('#timer-section');
+    if (!section) return;
 
     const status = game.timerStatus || 'idle';
     const half = game.timerHalf || 1;
     const remaining = timerRemaining(game);
 
-    if (status === 'idle') {
-      display.textContent = fmtTimer(HALF_SECS);
-      btn.textContent = '▶ Start';
-      btn.classList.remove('hidden');
-    } else if (status === 'running') {
-      display.textContent = (half === 1 ? '1H ' : '2H ') + fmtTimer(remaining);
-      btn.classList.add('hidden');
-      if (remaining === 0) {
-        if (half === 1) {
-          Storage.updateGameTimer(game.id, { timerStatus: 'halftime', timerStartedAt: null });
-          stopTimerInterval();
-          toast('Half Time!');
-        } else {
-          Storage.updateGameTimer(game.id, { timerStatus: 'done', timerStartedAt: null });
-          stopTimerInterval();
-          toast('Full Time!');
-        }
-        renderTimerSection(Storage.getLiveGame());
-        return;
-      }
-    } else if (status === 'halftime') {
-      display.textContent = 'HALF TIME';
-      btn.textContent = '▶ 2nd Half';
-      btn.classList.remove('hidden');
-    } else if (status === 'done') {
-      display.textContent = 'FULL TIME';
-      btn.classList.add('hidden');
+    if (status === 'running' && remaining === 0) {
+      Storage.updateGameTimer(game.id, { timerStatus: half === 1 ? 'halftime' : 'done', timerStartedAt: null });
+      stopTimerInterval();
+      toast(half === 1 ? 'Half Time!' : 'Full Time!');
+      renderTimerSection(Storage.getLiveGame());
+      return;
     }
+
+    let state, phaseText, timeText, btnText = null;
+    if (status === 'idle') {
+      state = 'idle'; phaseText = '1st Half'; timeText = fmtTimer(HALF_SECS); btnText = '▶ Start Match';
+    } else if (status === 'running') {
+      state = remaining <= WARN_SECS ? 'warn' : 'running';
+      phaseText = half === 1 ? '1st Half' : '2nd Half';
+      timeText = fmtTimer(remaining);
+    } else if (status === 'halftime') {
+      state = 'break'; phaseText = '1st Half complete'; timeText = 'Half Time'; btnText = '▶ Start 2nd Half';
+    } else {
+      state = 'done'; phaseText = 'Match complete'; timeText = 'Full Time';
+    }
+
+    section.className = 'timer-section t-' + state;
+    $('#timer-phase').textContent = phaseText;
+    $('#timer-display').textContent = timeText;
+    const btn = $('#timer-action-btn');
+    btn.classList.toggle('hidden', !btnText);
+    if (btnText) btn.textContent = btnText;
+
+    const hs = Storage.halfScores(game);
+    const showHt = hs.known && (status === 'halftime' || status === 'done' || (status === 'running' && half === 2));
+    const ht = $('#sticky-ht');
+    ht.classList.toggle('hidden', !showHt);
+    if (showHt) ht.textContent = `HT ${hs.h1.us}–${hs.h1.them}`;
 
     btn.onclick = () => {
       const g = Storage.getLiveGame();
       if (!g) return;
       const st = g.timerStatus || 'idle';
-      if (st === 'idle') {
-        Storage.updateGameTimer(g.id, { timerStatus: 'running', timerHalf: 1, timerStartedAt: Date.now() });
-      } else if (st === 'halftime') {
-        Storage.updateGameTimer(g.id, { timerStatus: 'running', timerHalf: 2, timerStartedAt: Date.now() });
-      }
+      if (st === 'idle') Storage.startHalf(g.id, 1);
+      else if (st === 'halftime') Storage.startHalf(g.id, 2);
+      else return;
       startTimerInterval(g.id);
       renderTimerSection(Storage.getLiveGame());
     };
@@ -110,9 +114,11 @@ const App = (() => {
     requestAnimationFrame(() => t.classList.add('show'));
     setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 1800);
   }
-  function statCount(game, playerId, statId) {
+  function statCount(game, playerId, statId, half) {
     let n = 0;
-    for (const e of game.log) if (e.playerId === playerId && e.statId === statId) n += e.delta;
+    for (const e of game.log) {
+      if (e.playerId === playerId && e.statId === statId && (half == null || e.half === half)) n += e.delta;
+    }
     return n;
   }
   function categoriesFromDefs(defs) {
@@ -274,8 +280,8 @@ const App = (() => {
     $('#sticky-opponent').textContent = `vs ${live.opponent}`;
     $('#sticky-score').textContent = `${live.teamScore} – ${live.oppScore}`;
 
-    $('#opp-plus').onclick = () => { Storage.setOppScore(live.id, live.oppScore + 1); renderLive(); };
-    $('#opp-minus').onclick = () => { Storage.setOppScore(live.id, live.oppScore - 1); renderLive(); };
+    $('#opp-plus').onclick = () => { Storage.addOppPoint(live.id, 1); renderLive(); };
+    $('#opp-minus').onclick = () => { Storage.addOppPoint(live.id, -1); renderLive(); };
 
     $('#btn-undo').onclick = () => {
       const entry = Storage.undoLast(live.id);
@@ -326,6 +332,7 @@ const App = (() => {
         el('span', { class: 'player-num' }, [p && p.number != null ? String(p.number) : '–']),
         el('span', { class: 'activity-text grow' }, [
           `${p ? p.name : 'Unknown'} — ${sd ? sd.label : entry.statId}`,
+          entry.half ? el('span', { class: 'half-tag' }, [entry.half === 1 ? '1H' : '2H']) : null,
           el('span', { class: 'muted small activity-time' }, [` ${time}`]),
         ]),
         el('button', {
@@ -573,6 +580,8 @@ const App = (() => {
       `${fmtDate(game.date)}${game.round ? ' · ' + game.round : ''}`,
       `${result} ${game.teamScore} – ${game.oppScore}`,
     ];
+    const hs = Storage.halfScores(game);
+    if (hs.known) lines.push(`Half time ${hs.h1.us} – ${hs.h1.them}  ·  2nd half ${hs.h2.us} – ${hs.h2.them}`);
     const scorers = data.players
       .map(p => ({ p, count: statCount(game, p.id, 'touchdowns') }))
       .filter(r => r.count > 0)
@@ -695,7 +704,64 @@ const App = (() => {
     });
   }
 
+  function halfScoreTable(game, hs, data) {
+    const margin = (h) => h.us - h.them;
+    const marginCell = (m) => el('td', { class: m > 0 ? 'm-pos' : m < 0 ? 'm-neg' : 'm-even' }, [m > 0 ? `+${m}` : String(m)]);
+    const final = { us: game.teamScore, them: game.oppScore };
+    return el('table', { class: 'half-table' }, [
+      el('thead', {}, [el('tr', {}, [
+        el('th', {}, ['']), el('th', {}, ['1st Half']), el('th', {}, ['2nd Half']), el('th', {}, ['Final']),
+      ])]),
+      el('tbody', {}, [
+        el('tr', {}, [el('td', { class: 'ht-team' }, [data.team.name]), el('td', {}, [String(hs.h1.us)]), el('td', {}, [String(hs.h2.us)]), el('td', { class: 'ht-final' }, [String(final.us)])]),
+        el('tr', {}, [el('td', { class: 'ht-team' }, [game.opponent]), el('td', {}, [String(hs.h1.them)]), el('td', {}, [String(hs.h2.them)]), el('td', { class: 'ht-final' }, [String(final.them)])]),
+        el('tr', { class: 'ht-margin' }, [el('td', { class: 'ht-team' }, ['Margin']), marginCell(margin(hs.h1)), marginCell(margin(hs.h2)), marginCell(margin(final))]),
+      ]),
+    ]);
+  }
+
+  function openHalfTimeModal(game) {
+    const data = Storage.get();
+    const hs = Storage.halfScores(game);
+    const wrap = el('div', { class: 'form-card' });
+    wrap.appendChild(el('h2', {}, ['Half-Time Score']));
+    wrap.appendChild(el('p', { class: 'muted' }, [`Final score was ${game.teamScore} – ${game.oppScore}. Enter the score at half-time; the 2nd half is worked out from the final.`]));
+    const us = el('input', { type: 'number', min: '0', max: String(game.teamScore), inputmode: 'numeric', value: hs.known ? String(hs.h1.us) : '' });
+    const them = el('input', { type: 'number', min: '0', max: String(game.oppScore), inputmode: 'numeric', value: hs.known ? String(hs.h1.them) : '' });
+    wrap.appendChild(el('label', {}, [data.team.name, us]));
+    wrap.appendChild(el('label', {}, [game.opponent, them]));
+    const err = el('p', { class: 'form-error hidden' });
+    wrap.appendChild(err);
+    const btnRow = el('div', { class: 'btn-row' });
+    btnRow.appendChild(el('button', { class: 'btn', onclick: closeModal }, ['Cancel']));
+    if (game.htScore) {
+      btnRow.appendChild(el('button', {
+        class: 'btn',
+        onclick: () => { Storage.setHalfTimeScore(game.id, null); closeModal(); openGameDetail(game.id); },
+      }, ['Use Recorded Score']));
+    }
+    btnRow.appendChild(el('button', {
+      class: 'btn btn-primary',
+      onclick: () => {
+        const u = Number(us.value), t = Number(them.value);
+        const valid = us.value !== '' && them.value !== '' && Number.isInteger(u) && Number.isInteger(t)
+          && u >= 0 && t >= 0 && u <= game.teamScore && t <= game.oppScore;
+        if (!valid) {
+          err.textContent = `Half-time scores must be whole numbers no higher than the final score (${game.teamScore} – ${game.oppScore}).`;
+          err.classList.remove('hidden');
+          return;
+        }
+        Storage.setHalfTimeScore(game.id, { us: u, them: t });
+        closeModal();
+        openGameDetail(game.id);
+      },
+    }, ['Save']));
+    wrap.appendChild(btnRow);
+    openModal(wrap);
+  }
+
   function openGameDetail(gameId) {
+    if (gameId !== historyDetailId) detailHalf = null;
     historyDetailId = gameId;
     const game = Storage.getGame(gameId);
     const data = Storage.get();
@@ -712,12 +778,41 @@ const App = (() => {
       return;
     }
 
+    const hs = Storage.halfScores(game);
     const header = el('div', { class: 'card' }, [
       el('h2', {}, [`vs ${game.opponent}`]),
       el('p', { class: 'muted' }, [`${fmtDate(game.date)}${game.round ? ' · ' + game.round : ''}`]),
       el('div', { class: 'big-score' }, [`${game.teamScore} – ${game.oppScore}`]),
     ]);
+    if (hs.known) {
+      header.appendChild(halfScoreTable(game, hs, data));
+      if (hs.manual) header.appendChild(el('p', { class: 'muted small' }, ['Half-time score entered manually.']));
+    } else {
+      header.appendChild(el('p', { class: 'muted small' }, ['Half-time score not recorded for this game.']));
+    }
+    header.appendChild(el('button', { class: 'btn btn-ghost btn-sm', onclick: () => openHalfTimeModal(game) }, [
+      hs.known ? 'Edit Half-Time Score' : 'Add Half-Time Score',
+    ]));
     content.appendChild(header);
+
+    const halfData = Storage.hasHalfData(game);
+    if (halfData) {
+      const chips = el('div', { class: 'tab-row detail-half-chips' });
+      [[null, 'Full Game'], [1, '1st Half'], [2, '2nd Half']].forEach(([h, label]) => {
+        chips.appendChild(el('button', {
+          class: 'tab-chip' + (detailHalf === h ? ' active' : ''),
+          onclick: () => { detailHalf = h; openGameDetail(game.id); },
+        }, [label]));
+      });
+      content.appendChild(chips);
+      const untagged = game.log.filter(e => e.half == null).length;
+      if (detailHalf != null && untagged) {
+        content.appendChild(el('p', { class: 'hint' }, [`${untagged} stat${untagged === 1 ? '' : 's'} in this game weren't linked to a half, so aren't shown here.`]));
+      }
+    } else {
+      content.appendChild(el('p', { class: 'hint' }, ['Stats by half weren’t recorded for this game — they’re captured when the match timer is used.']));
+    }
+    const half = halfData ? detailHalf : null;
 
     const players = data.players.filter(p => game.playerIds.includes(p.id));
     const table = el('table', { class: 'stat-grid detail-grid' });
@@ -734,7 +829,7 @@ const App = (() => {
         el('span', { class: 'player-num' }, [p.number != null ? String(p.number) : '–']),
         el('span', { class: 'player-name' }, [p.name]),
       ]));
-      data.statDefs.forEach(s => tr.appendChild(el('td', {}, [String(statCount(game, p.id, s.id))])));
+      data.statDefs.forEach(s => tr.appendChild(el('td', {}, [String(statCount(game, p.id, s.id, half))])));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -743,7 +838,7 @@ const App = (() => {
     const totalRow = el('tr', { class: 'team-total-row' });
     totalRow.appendChild(el('td', { class: 'col-player' }, ['TEAM TOTAL']));
     data.statDefs.forEach(s => {
-      const total = players.reduce((sum, p) => sum + statCount(game, p.id, s.id), 0);
+      const total = players.reduce((sum, p) => sum + statCount(game, p.id, s.id, half), 0);
       totalRow.appendChild(el('td', {}, [String(total)]));
     });
     tfoot.appendChild(totalRow);
@@ -948,14 +1043,47 @@ const App = (() => {
     const data = Storage.get();
     const games = Storage.completedGames();
     const cum = Storage.cumulativeTotals();
-    let rows = [['Number', 'Player', ...data.statDefs.map(s => s.label)]];
+    const byHalf = {};
+    for (const g of games) {
+      for (const e of g.log) {
+        if (e.half !== 1 && e.half !== 2) continue;
+        const k = `${e.playerId}|${e.statId}`;
+        if (!byHalf[k]) byHalf[k] = [0, 0];
+        byHalf[k][e.half - 1] += e.delta;
+      }
+    }
+    const halfVal = (p, s, h) => (byHalf[`${p.id}|${s.id}`] || [0, 0])[h];
+    let rows = [[
+      'Number', 'Player',
+      ...data.statDefs.map(s => s.label),
+      ...data.statDefs.map(s => `${s.label} (1st half)`),
+      ...data.statDefs.map(s => `${s.label} (2nd half)`),
+    ]];
     data.players.forEach(p => {
-      rows.push([p.number != null ? p.number : '', p.name, ...data.statDefs.map(s => (cum[p.id] && cum[p.id][s.id]) || 0)]);
+      rows.push([
+        p.number != null ? p.number : '', p.name,
+        ...data.statDefs.map(s => (cum[p.id] && cum[p.id][s.id]) || 0),
+        ...data.statDefs.map(s => halfVal(p, s, 0)),
+        ...data.statDefs.map(s => halfVal(p, s, 1)),
+      ]);
     });
     rows.push([]);
     rows.push(['Games completed', games.length]);
+    rows.push([]);
+    rows.push(['Date', 'Opponent', 'Round', 'Half time', '2nd half', 'Final']);
+    games.forEach(g => {
+      const hs = Storage.halfScores(g);
+      rows.push([
+        g.date, g.opponent, g.round || '',
+        // En-dash, not hyphen: Excel silently converts "12-3" into a date.
+        hs.known ? `${hs.h1.us} – ${hs.h1.them}` : '',
+        hs.known ? `${hs.h2.us} – ${hs.h2.them}` : '',
+        `${g.teamScore} – ${g.oppScore}`,
+      ]);
+    });
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    downloadFile(`${data.team.name.replace(/\s+/g, '_')}_stats.csv`, csv, 'text/csv');
+    // BOM so Excel reads the file as UTF-8 (dashes in round names and scores).
+    downloadFile(`${data.team.name.replace(/\s+/g, '_')}_stats.csv`, '﻿' + csv, 'text/csv;charset=utf-8');
   }
 
   // ---------- init ----------
@@ -1045,6 +1173,14 @@ const App = (() => {
       wrap.appendChild(btnRow);
       openModal(wrap);
     });
+
+    // The tiles column sticks below the score bar on wide screens; keep its offset in step with the bar's height.
+    const stickyBar = $('#live-sticky-score');
+    if (stickyBar && 'ResizeObserver' in window) {
+      new ResizeObserver(() => {
+        document.documentElement.style.setProperty('--sticky-h', stickyBar.offsetHeight + 'px');
+      }).observe(stickyBar);
+    }
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && currentView === 'live') {

@@ -161,23 +161,62 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 /* Sticky score bar */
 .live-sticky-score {
   position: sticky; top: 0; z-index: 6;
-  display: flex; align-items: center; gap: 10px;
   background: var(--navy); color: #fff; border-radius: 12px;
-  padding: 9px 14px; margin-bottom: 12px; font-weight: 700; font-size: 14px;
+  padding: 10px 16px 12px; margin-bottom: 12px; font-weight: 700; font-size: 14px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
-#sticky-opponent { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-#sticky-score { font-size: 17px; font-weight: 800; flex-shrink: 0; }
+.sticky-top { display: flex; align-items: center; gap: 10px; }
+#sticky-opponent { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+#sticky-score { font-size: 20px; font-weight: 800; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.sticky-ht {
+  flex-shrink: 0; font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.14); padding: 3px 9px; border-radius: 6px; font-variant-numeric: tabular-nums;
+}
 
 /* Game timer */
-.timer-section { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
-.timer-display { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: -0.3px; }
-.timer-action-btn {
-  background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.38);
-  color: #fff; border-radius: 7px; padding: 5px 9px;
-  font-size: 12px; font-weight: 700; cursor: pointer; touch-action: manipulation; white-space: nowrap;
+.timer-section {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.16);
 }
-.timer-action-btn:active { background: rgba(255,255,255,0.35); transform: scale(0.95); }
+.timer-readout { display: flex; flex-direction: column; min-width: 0; }
+.timer-phase { font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,0.7); }
+.timer-display {
+  font-size: 46px; font-weight: 800; line-height: 1.05; letter-spacing: -1px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.timer-action-btn {
+  background: var(--red); border: none; color: #fff; border-radius: 12px;
+  min-height: 56px; padding: 0 26px; font-size: 18px; font-weight: 800;
+  cursor: pointer; touch-action: manipulation; white-space: nowrap;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+}
+.timer-action-btn:active { background: var(--red-dark); transform: scale(0.96); }
+.t-warn .timer-display, .t-warn .timer-phase { color: #f5b544; }
+.t-break .timer-display, .t-done .timer-display { font-size: 38px; letter-spacing: 0; }
+.t-done .timer-display { color: rgba(255,255,255,0.85); }
+@media (max-width: 520px) {
+  .timer-action-btn { width: 100%; }
+}
+
+.half-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 5px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--muted);
+  font-size: 10px; font-weight: 800; letter-spacing: 0.3px; vertical-align: 1px;
+}
+
+/* Half-time score breakdown (game detail) */
+.half-table { border-collapse: collapse; margin: 12px 0 8px; font-size: 14px; }
+.half-table th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; padding: 4px 14px; text-align: center; }
+.half-table td { padding: 6px 14px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; border-top: 1px solid var(--border); }
+.half-table td.ht-team { text-align: left; padding-left: 0; font-weight: 600; }
+.half-table td.ht-final { font-weight: 800; }
+.half-table tr.ht-margin td { font-size: 13px; }
+.m-pos { color: var(--green); }
+.m-neg { color: var(--red); }
+.m-even { color: var(--muted); }
+.btn-sm { padding: 7px 12px; font-size: 13px; }
+.detail-half-chips { margin: 16px 0 10px; }
+.form-error { color: var(--red); font-size: 13px; font-weight: 600; margin: 0; }
 
 /* Live game header card */
 .live-header-card { margin-bottom: 14px; }
@@ -201,7 +240,7 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .live-col-totals { margin-top: 0; }
 @media (min-width: 1000px) {
   .live-split { display: flex; gap: 20px; align-items: flex-start; }
-  .live-col-tiles { flex: 0 0 40%; position: sticky; top: 54px; }
+  .live-col-tiles { flex: 0 0 40%; position: sticky; top: calc(var(--sticky-h, 130px) + 12px); }
   .live-col-totals { flex: 1 1 60%; min-width: 0; }
 }
 
@@ -379,9 +418,11 @@ html.outdoor-mode .stat-card-avg { font-size: 15px; }
 html.outdoor-mode .section-row h2 { font-size: 16px; }
 html.outdoor-mode .hint { font-size: 14px; }
 html.outdoor-mode .live-sticky-score { font-size: 16px; }
-html.outdoor-mode #sticky-score { font-size: 19px; }
-html.outdoor-mode .timer-display { font-size: 17px; }
-html.outdoor-mode .timer-action-btn { font-size: 13px; padding: 6px 11px; }
+html.outdoor-mode .timer-display { font-size: 56px; }
+html.outdoor-mode .t-break .timer-display, html.outdoor-mode .t-done .timer-display { font-size: 44px; }
+html.outdoor-mode .timer-phase { font-size: 14px; }
+html.outdoor-mode .timer-action-btn { font-size: 20px; min-height: 62px; }
+html.outdoor-mode #sticky-score { font-size: 22px; }
 
 /* Offline cache status */
 .offline-warning {

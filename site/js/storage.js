@@ -142,6 +142,7 @@ const Storage = (() => {
       oppScore: 0,
       playerIds: data.players.filter(p => p.active).map(p => p.id),
       log: [],
+      oppLog: [],
       createdAt: Date.now(),
       fixtureId: fixtureId || null,
       timerHalf: 1,
@@ -161,6 +162,31 @@ const Storage = (() => {
     save();
   }
 
+  // Half an event belongs to, from the timer state. Entries during the break count
+  // toward the half just finished; null means the timer hasn't been started yet.
+  function currentHalf(g) {
+    const st = g.timerStatus || 'idle';
+    if (st === 'running') return g.timerHalf || 1;
+    if (st === 'halftime') return 1;
+    if (st === 'done') return 2;
+    return null;
+  }
+
+  function startHalf(gameId, half) {
+    load();
+    const g = data.games.find(x => x.id === gameId);
+    if (!g) return;
+    g.timerStatus = 'running';
+    g.timerHalf = half;
+    g.timerStartedAt = Date.now();
+    // Anything logged before the clock was first started (scorer forgot to press Start) is 1st-half play.
+    if (half === 1) {
+      for (const e of g.log) if (e.half == null) e.half = 1;
+      for (const e of (g.oppLog || [])) if (e.half == null) e.half = 1;
+    }
+    save();
+  }
+
   function getGame(id) {
     load();
     return data.games.find(g => g.id === id);
@@ -175,7 +201,7 @@ const Storage = (() => {
     load();
     const g = data.games.find(x => x.id === gameId);
     if (!g) return;
-    g.log.push({ id: uid(), playerId, statId, delta, ts: Date.now() });
+    g.log.push({ id: uid(), playerId, statId, delta, ts: Date.now(), half: currentHalf(g) });
     if (statId === 'touchdowns' && delta > 0) g.teamScore += delta;
     if (statId === 'touchdowns' && delta < 0) g.teamScore = Math.max(0, g.teamScore + delta);
     save();
@@ -207,10 +233,57 @@ const Storage = (() => {
     return entry;
   }
 
-  function setOppScore(gameId, score) {
+  function addOppPoint(gameId, delta) {
     load();
     const g = data.games.find(x => x.id === gameId);
-    if (g) { g.oppScore = Math.max(0, score); save(); }
+    if (!g) return;
+    if (!g.oppLog) g.oppLog = [];
+    if (delta > 0) {
+      g.oppLog.push({ id: uid(), ts: Date.now(), half: currentHalf(g) });
+      g.oppScore += 1;
+    } else if (g.oppScore > 0) {
+      // Games from before oppLog existed have points with no events behind them.
+      if (g.oppLog.length > g.oppScore - 1) g.oppLog.pop();
+      g.oppScore -= 1;
+    }
+    save();
+  }
+
+  function setHalfTimeScore(gameId, ht) {
+    load();
+    const g = data.games.find(x => x.id === gameId);
+    if (!g) return;
+    if (ht) g.htScore = { us: ht.us, them: ht.them };
+    else delete g.htScore;
+    save();
+  }
+
+  // { h1:{us,them}, h2:{us,them}, known, manual } — known is false when some scoring
+  // can't be placed in a half (timer never used) and no manual half-time score was entered.
+  function halfScores(g) {
+    if (g.htScore) {
+      return {
+        h1: { us: g.htScore.us, them: g.htScore.them },
+        h2: { us: g.teamScore - g.htScore.us, them: g.oppScore - g.htScore.them },
+        known: true, manual: true,
+      };
+    }
+    const h1 = { us: 0, them: 0 }, h2 = { us: 0, them: 0 };
+    for (const e of g.log) {
+      if (e.statId !== 'touchdowns') continue;
+      if (e.half === 1) h1.us += e.delta;
+      else if (e.half === 2) h2.us += e.delta;
+    }
+    for (const e of (g.oppLog || [])) {
+      if (e.half === 1) h1.them += 1;
+      else if (e.half === 2) h2.them += 1;
+    }
+    const known = h1.us + h2.us === g.teamScore && h1.them + h2.them === g.oppScore;
+    return { h1, h2, known, manual: false };
+  }
+
+  function hasHalfData(g) {
+    return g.log.some(e => e.half != null) || (g.oppLog || []).some(e => e.half != null);
   }
 
   function updateGameMeta(gameId, fields) {
@@ -349,7 +422,8 @@ const Storage = (() => {
   return {
     get, addPlayer, updatePlayer, removePlayer,
     addStatDef, updateStatDef, removeStatDef, reorderStatDefs,
-    createGame, getGame, getLiveGame, logStat, undoLast, removeLogEntry, setOppScore, updateGameMeta, updateGameTimer, endGame, reopenGame, deleteGame,
+    createGame, getGame, getLiveGame, logStat, undoLast, removeLogEntry, addOppPoint, updateGameMeta, updateGameTimer, startHalf, endGame, reopenGame, deleteGame,
+    halfScores, hasHalfData, setHalfTimeScore,
     addFixture, updateFixture, removeFixture, listFixtures, nextFixture,
     computeTotals, completedGames, cumulativeTotals, teamTotalsFor, record,
     exportJSON, importJSON, resetAll, updateSettings,
